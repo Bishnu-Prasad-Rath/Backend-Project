@@ -1,0 +1,17 @@
+{
+  "name": "yt",
+  "version": "1.0.0",
+  "description": "This is a backend tutorial",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "JS",
+    "React",
+    "Express",
+    "Mongo"
+  ],
+  "author": "Bishnu Prasad Rath",
+  "license": "ISC"
+}
