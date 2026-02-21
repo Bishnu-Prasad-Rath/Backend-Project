@@ -15,7 +15,7 @@ import fs from 'fs';
                  });
                  console.log("Upload Result:", response);
                  //File has been uploaded successfully, now we can remove the file from local storage
-                 fs.unlinkSync(localFilePath);
+                //  fs.unlinkSync(localFilePath);
                  return response;
              } catch (error) {
                  fs.unlinkSync(localFilePath);   // remove the locally saved temp file in case of an error as well
