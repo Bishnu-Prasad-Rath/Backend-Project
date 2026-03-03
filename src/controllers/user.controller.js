@@ -5,6 +5,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose"
+import cloudinary from "cloudinary"
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -168,8 +169,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,  //this removes the field from document.
       },
     },
     {
@@ -204,7 +205,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET
     );
 
-    const user = await User.findById(decodedToken?._id).select;
+    const user = await User.findById(decodedToken?._id);
 
     if (!user) {
       throw new ApiError(401, "Invalid refresh token - user not found");
@@ -265,6 +266,11 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullName, email } = req.body;
+  console.log(req.body,"-------",req.user);
+  
+
+  console.log(fullName ,"----", email);
+  
 
   if (!fullName || !email) {
     throw new ApiError(400, "All fields are required.");
@@ -331,7 +337,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (!coverImageLocalPath) {
     throw new ApiError(400, "CoverImage is required");
   }
-  const CoverImage = await uploadOnCloudinary(coverImageLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (!coverImage.url) {
     throw new ApiError(400, "Uploading CoverImage failed");
@@ -391,7 +397,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
         },
         isSubscribed : {
           $cond : {
-            if : {$in : [req.User?._id,"subscribers.subscriber"]},
+            if : {$in : [req.User?._id,"$subscribers.subscriber"]},
             then : true,
             else : false
           }
@@ -433,7 +439,7 @@ const getWatchHistory = asyncHandler(async(req,res)=>{
       $lookup : {
         from : "videos",
         localField : "watchHistory",
-        foreignfield : "_id",
+        foreignField : "_id",
         as : "watchHistory",
       pipeline : [
         {
@@ -442,13 +448,14 @@ const getWatchHistory = asyncHandler(async(req,res)=>{
             localField : "owner",
             foreignField : "_id",
             as : "owner",
-            pipeline : {
+            pipeline : [{
               $project : {
                 fullName : 1,
                 username : 1,
                 avatar : 1
               }
             }
+          ]
           }
         },
         {
