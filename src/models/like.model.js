@@ -9,7 +9,7 @@ comment : {
     type : Schema.Types.ObjectId,
     ref : "Comment"
 },
-tweete : {
+tweet : {
     type : Schema.Types.ObjectId,
     ref : "Tweet"
 },
