@@ -1,6 +1,6 @@
 import mongoose,{Schema} from "mongoose";
 
-const playListSchema = new Schema({
+const playlistSchema = new Schema({
 name : {
     type : String,
     required : true
@@ -19,6 +19,6 @@ owner : {
 } 
 },{timestamps : true})
 
-const PlayList = mongoose.model("PlayList",playListSchema)
+const Playlist = mongoose.model("Playlist",playlistSchema)
 
-export {PlayList}
+export {Playlist}

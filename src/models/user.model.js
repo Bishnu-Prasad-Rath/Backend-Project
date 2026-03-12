@@ -25,6 +25,10 @@ const userSchema = new Schema(
       trim: true,
       index: true,
     },
+      subscriberCount: {
+    type: Number,
+    default: 0
+  },
     avatar: {
       type: String,
       required: true, //cloudinary url
