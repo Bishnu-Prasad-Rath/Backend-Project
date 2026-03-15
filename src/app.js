@@ -32,6 +32,8 @@ import likeRouter from "./routes/like.routes.js"
 import commentRouter from "./routes/comment.routes.js"
 import playlistRouter from "./routes/playlist.routes.js"
 import subscriptionRouter from "./routes/subscription.routes.js"
+import dashboardRouter from "./routes/dashboard.routes.js"
+import healthCheckRouter from "./routes/healthcheck.routes.js"
 
 
 //Routes delcaration
@@ -43,7 +45,8 @@ app.use("/api/v1/like", likeRouter);
 app.use("/api/v1/comment",commentRouter);
 app.use("/api/v1/playlist",playlistRouter)
 app.use("/api/v1/subscription",subscriptionRouter)
-
+app.use("/api/v1/dashboard",dashboardRouter)
+app.use("/api/v1/healthCheck",healthCheckRouter)
 
 
 app.use(errorHandler);
