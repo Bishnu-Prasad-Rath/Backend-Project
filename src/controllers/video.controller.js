@@ -1,4 +1,4 @@
-import mongoose, { isValidObjectId } from "mongoose";
+import mongoose from "mongoose";
 import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -8,9 +8,31 @@ import {
   deleteFromCloudinary,
   getPublicId,
 } from "../utils/cloudinary.js";
+import { getCache,setCache,deleteCache } from "../redis/cache/base.cache.js";
+import {getVideoCache,setVideoCache,deleteVideoCache,getVideosCache,setVideosCache,deleteVideosCache} from  "../redis/cache/video.cache.js"
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+const params = { page, limit, query, sortBy, sortType, userId };
+
+const isListValid = await getCache("videos:all")
+
+let cachedVideos = null;
+
+  if (isListValid) {
+    cachedVideos = await getVideosCache(params);
+  }
+
+  if(cachedVideos){
+    return res
+    .status(200)
+    .json(new ApiResponse(
+      200,
+      cachedVideos,
+      "Videos fetched from the cache."
+    ))
+  }
+
   const pageNumber = parseInt(page);
   const limitNumber = parseInt(limit);
   const skip = (pageNumber - 1) * limitNumber;
@@ -69,9 +91,13 @@ const getAllVideos = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if (!videos) {
+  if (!videos.length) {
     throw new ApiError(404, "Videos not found");
   }
+
+  await setVideosCache(params,videos);
+  
+  await setCache("videos:all", true);
 
   return res
     .status(200)
@@ -109,6 +135,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     duration: uploadedVideo.duration,
   });
 
+await deleteCache("videos:all")
+
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video published successfully"));
@@ -119,6 +147,16 @@ const getVideoById = asyncHandler(async (req, res) => {
 
   if (!mongoose.Types.ObjectId.isValid(videoId)) {
     throw new ApiError(400, "Invalid video ID");
+  }
+
+  const cachedVideo = await getVideoCache(videoId);
+
+  if(cachedVideo){
+    return res
+    .status(200)
+    .json(new ApiResponse(
+      200,cachedVideo,"Video fetched from cache."
+    ))
   }
 
   const video = await Video.aggregate([
@@ -158,9 +196,11 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
-  await Video.findByIdAndUpdate(videoId, {
-    $inc: { views: 1 },
-  });
+await Video.findByIdAndUpdate(videoId, {
+  $inc: { views: 1 },
+});
+
+await deleteVideoCache(videoId);
 
   return res
     .status(200)
@@ -204,6 +244,10 @@ const updateVideo = asyncHandler(async (req, res) => {
 
   await video.save();
 
+await deleteVideoCache(videoId);
+
+await deleteCache("videos:all");
+
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video updated successfully"));
@@ -234,6 +278,10 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
   await Video.findByIdAndDelete(videoId);
 
+await deleteVideoCache(videoId);
+
+await deleteCache("videos:all")
+
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video deleted successfully"));
@@ -262,6 +310,10 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   video.isPublished = !video.isPublished;
 
   await video.save();
+
+await deleteVideoCache(videoId);
+
+await deleteCache("videos:all");
 
   return res
     .status(200)
