@@ -4,6 +4,7 @@ import {
   getChannelVideos,
 } from "../controllers/dashboard.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { rateLimitMiddleware } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 

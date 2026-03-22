@@ -1,7 +1,7 @@
 import dotenv from "dotenv"; 
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
-import { connectRedis } from "./redis/client.js";
+import { connectRedis } from "./config/redis.config.js";
 
 dotenv.config({
     path: "./.env"

@@ -1,4 +1,4 @@
-import redisClient from "../../config/redis.config.js";
+import {redisClient} from "../../config/redis.config.js";
 
  const getCache = async (key) => {
   const data = await redisClient.get(key);
