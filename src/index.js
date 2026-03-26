@@ -1,29 +1,43 @@
-import dotenv from "dotenv"; 
+import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 import { connectRedis } from "./config/redis.config.js";
+import http from "http";
+import { Server } from "socket.io";
+import { initSocket } from "./socket/socket.js";
+import { setIO } from "./socket/socketInstance.js";
 
 dotenv.config({
-    path: "./.env"
+  path: "./.env",
 });
 
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+initSocket(io);
+setIO(io);
+
 const startServer = async () => {
-    try {
-        await connectDB();
-        await connectRedis();
+  try {
+    await connectDB();
+    await connectRedis();
 
-        app.on("ERROR",(error)=>{
-            console.log(`There is something server error ${error}`);
-            throw error;
-        });
+    app.on("ERROR", (error) => {
+      console.log(`There is something server error ${error}`);
+      throw error;
+    });
 
-        app.listen(process.env.PORT || 8000,()=>{
-            console.log(`Server is running on port ${process.env.PORT} from root index.js`);
-        });
-
-    } catch (error) {
-        console.log("Server start FAILED:", error);
-    }
+    server.listen(process.env.PORT || 8000, () => {
+      console.log(`🚀 Server running with WebSocket`);
+    });
+  } catch (error) {
+    console.log("Server start FAILED:", error);
+  }
 };
 
 startServer();
