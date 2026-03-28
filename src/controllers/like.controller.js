@@ -4,6 +4,20 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getIO } from "../socket/socketInstance.js";
+import {
+  incrementVideoLikes,
+  decrementVideoLikes,
+  getVideoLikes,
+  incrementCommentLikes,
+  decrementCommentLikes,
+  incrementTweetLikes,
+  decrementTweetLikes,
+  setVideoLikes,
+  getCommentLikes,
+  setCommentLikes,
+  getTweetLikes,
+  setTweetLikes,
+} from "../redis/cache/like.cache.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -21,30 +35,37 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 
   let action;
   let like;
+  let totalLikes;
 
-if(existingLike){
-  await Like.findByIdAndDelete(existingLike._id);
-  action = "unlike";
-}else{
-  like = await Like.create({
-    video : videoId,
-    likedBy : req.user._id,
-  });
-  action = "like";
+  if (existingLike) {
+    await Like.findByIdAndDelete(existingLike._id);
+    action = "unlike";
+
+    totalLikes = await decrementVideoLikes(videoId);
+  } else {
+    like = await Like.create({
+      video: videoId,
+      likedBy: req.user._id,
+    });
+    action = "like";
+
+    totalLikes = await incrementVideoLikes(videoId);
+  }
+
+totalLikes = Number(totalLikes) || 0;
+
+if (totalLikes < 0) {
+  let redisLikes = await getVideoLikes(videoId);
+
+  if (redisLikes !== null) {
+    totalLikes = Number(redisLikes) || 0;
+  } else {
+    const dbCount = await Like.countDocuments({ video: videoId });
+    await setVideoLikes(videoId, dbCount);
+    totalLikes = dbCount;
+  }
 }
-
-  const totalLikes = await Like.countDocuments({
-    video: videoId,
-  });
-
-  io.to(videoId).emit("video:like", {
-    videoId,
-    userId: req.user._id,
-    action,
-    totalLikes,
-  });
-
-  return res
+  res
     .status(200)
     .json(
       new ApiResponse(
@@ -53,6 +74,13 @@ if(existingLike){
         action === "like" ? "Video liked" : "Video unliked"
       )
     );
+
+  io.to(videoId).emit("video:like", {
+    videoId,
+    userId: req.user._id,
+    action,
+    totalLikes,
+  });
 });
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
@@ -71,32 +99,38 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
   let action;
   let like;
+  let totalLikes;
 
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
-  }else{
-   like = await Like.create({
-    comment: commentId,
-    likedBy: req.user._id,
-  });
+    totalLikes = await decrementCommentLikes(commentId);
+  } else {
+    like = await Like.create({
+      comment: commentId,
+      likedBy: req.user._id,
+    });
 
-  action = "like";
+    action = "like";
+
+    totalLikes = await incrementCommentLikes(commentId);
   }
 
+totalLikes = Number(totalLikes) || 0;
 
-  const totalLikes = await Like.countDocuments({
-    comment: commentId,
-  });
+if (totalLikes < 0) {
+  let redisLikes = await getCommentLikes(commentId);
 
-  io.to(commentId).emit("comment:like", {
-    commentId,
-    userId: req.user._id,
-    action,
-    totalLikes,
-  });
+  if (redisLikes !== null) {
+    totalLikes = Number(redisLikes) || 0;
+  } else {
+    const dbCount = await Like.countDocuments({ comment: commentId });
+    await setCommentLikes(commentId, dbCount);
+    totalLikes = dbCount;
+  }
+}
 
-  return res
+  res
     .status(200)
     .json(
       new ApiResponse(
@@ -105,6 +139,13 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
         action === "like" ? "Comment liked" : "Comment unliked"
       )
     );
+
+  io.to(commentId).emit("comment:like", {
+    commentId,
+    userId: req.user._id,
+    action,
+    totalLikes,
+  });
 });
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
@@ -123,30 +164,37 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
   let action;
   let like;
+  let totalLikes;
 
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
-  }else{
-       like = await Like.create({
-    tweet: tweetId,
-    likedBy: req.user._id,
-  });
-  action = "like";
+    totalLikes = await decrementTweetLikes(tweetId);
+  } else {
+    like = await Like.create({
+      tweet: tweetId,
+      likedBy: req.user._id,
+    });
+    action = "like";
+
+    totalLikes = await incrementTweetLikes(tweetId);
   }
 
-  const totalLikes = await Like.countDocuments({
-    tweet: tweetId,
-  });
+totalLikes = Number(totalLikes) || 0;
 
-  io.to(tweetId).emit("tweet:like", {
-    tweetId,
-    userId: req.user._id,
-    action,
-    totalLikes,
-  });
+if (totalLikes < 0) {
+  let redisLikes = await getTweetLikes(tweetId);
 
-  return res
+  if (redisLikes !== null) {
+    totalLikes = Number(redisLikes) || 0;
+  } else {
+    const dbCount = await Like.countDocuments({ tweet: tweetId });
+    await setTweetLikes(tweetId, dbCount);
+    totalLikes = dbCount;
+  }
+}
+
+  res
     .status(200)
     .json(
       new ApiResponse(
@@ -155,6 +203,13 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
         action === "like" ? "tweet liked" : "tweet unliked"
       )
     );
+
+  io.to(tweetId).emit("tweet:like", {
+    tweetId,
+    userId: req.user._id,
+    action,
+    totalLikes,
+  });
 });
 
 const getLikedVideos = asyncHandler(async (req, res) => {
