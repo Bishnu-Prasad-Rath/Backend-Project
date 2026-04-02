@@ -1,44 +1,84 @@
-import mongoose, { isValidObjectId } from "mongoose";
-import { User } from "../models/user.model.js";
+import { isValidObjectId } from "mongoose";
 import { Subscription } from "../models/subscription.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { addSubscription, removeSubscription, isSubscriberd, getSubscribersCount } from "../redis/cache/subscription.cache.js";
+import {getIO} from "../socket/socketInstance.js";
 
 const toggleSubscription = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
+  const userId = req.user._id;
 
   if (!isValidObjectId(channelId)) {
     throw new ApiError(400, "Channel ID is invalid");
   }
 
-  if (channelId === req.user._id.toString()) {
+  if (channelId === userId.toString()) {
     throw new ApiError(400, "You can not subscribe to yourself.");
   }
 
   const existingSubscription = await Subscription.findOne({
-    subscriber: req.user._id,
+    subscriber: userId,
     channel: channelId,
   });
+
+  let action;
+  let subscription = null;
 
   if (existingSubscription) {
     await Subscription.findByIdAndDelete(existingSubscription._id);
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, {}, "Channel unsubscribed"));
+    await removeSubscription(userId, channelId);
+
+    action = "unsubscribe";
+  } else {
+    subscription = await Subscription.create({
+      subscriber: userId,
+      channel: channelId,
+    });
+
+    await addSubscription(userId, channelId);
+
+    action = "subscribe";
   }
 
-  const subscription = await Subscription.create({
-    subscriber: req.user._id,
-    channel: channelId,
-  });
+  // 🔥 Redis count
+  let totalSubscribers = await getSubscribersCount(channelId);
 
-  await User.findByIdAndUpdate(channelId, { $inc: { subscriberCount: 1 } });
+  // ✅ correct fallback check
+  if (totalSubscribers === null || totalSubscribers === undefined) {
+    const dbCount = await Subscription.countDocuments({
+      channel: channelId,
+    });
+    totalSubscribers = dbCount;
+  }
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, subscription, "Channel subscribed"));
+  const io = getIO();
+
+  io.to(channelId).emit("channel:subscription",{
+    channelId,
+    userId,
+    action,
+    totalSubscribers,
+  })
+
+const isUserSubscribed = await isSubscriberd(userId, channelId);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        action,
+        subscription,
+        isSubscribed: isUserSubscribed,
+        totalSubscribers,
+      },
+      action === "subscribe"
+        ? "Channel subscribed"
+        : "Channel unsubscribed"
+    )
+  );
 });
 
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {

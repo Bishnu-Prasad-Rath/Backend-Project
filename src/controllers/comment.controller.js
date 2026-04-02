@@ -3,21 +3,49 @@ import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import {
+  getCommentsCache,
+  setCommentsCache,
+  deleteCommentsCache,
+} from "../redis/cache/comment.cache.js";
+import { getIO } from "../socket/socketInstance.js";
 
 const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  const { page = 1, limit = 10 } = req.query;
+  let { page = 1, limit = 2 } = req.query;
 
   if (!mongoose.Types.ObjectId.isValid(videoId)) {
     throw new ApiError(400, "Invalid VideoId");
   }
 
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  console.time("FULL_REQUEST");
+
+  const cached = await getCommentsCache(videoId, page);
+
+  if (cached) {
+    console.log("Cached HIT");
+    console.timeEnd("FULL_REQUEST");
+    return res
+      .status(200)
+      .json(new ApiResponse(200, cached, "Comments fetched from cache."));
+  }
+
+    console.timeEnd("FULL_REQUEST");
+
+
   const skip = (page - 1) * limit;
 
   const comments = await Comment.find({ video: videoId })
+    .select("content createdAt")
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(parseInt(limit));
+    .limit(limit)
+    .lean();
+
+  await setCommentsCache(videoId, page, comments);
 
   return res
     .status(200)
@@ -40,6 +68,14 @@ const addComment = asyncHandler(async (req, res) => {
     content,
     video: videoId,
     owner: req.user._id,
+  });
+
+  await deleteCommentsCache(videoId);
+
+  const io = getIO();
+  io.to(videoId).emit("comment:new", {
+    videoId,
+    comment,
   });
 
   return res
@@ -75,6 +111,8 @@ const updateComment = asyncHandler(async (req, res) => {
 
   await comment.save();
 
+  await deleteCommentsCache(comment.video);
+
   return res
     .status(200)
     .json(new ApiResponse(200, comment, "Comment updated successfully"));
@@ -98,6 +136,8 @@ const deleteComment = asyncHandler(async (req, res) => {
   }
 
   await Comment.findByIdAndDelete(commentId);
+
+  await deleteCommentsCache(comment.video);
 
   return res
     .status(200)

@@ -18,7 +18,8 @@ const commentSchema = new Schema(
 }
 ,{timestamps : true})
 
-commentSchema.plugin(mongooseAggregatePaginate)
+commentSchema.plugin(mongooseAggregatePaginate);
+commentSchema.index({ video: 1, createdAt: -1 });
 
 const Comment = mongoose.model("Comment",commentSchema) 
  

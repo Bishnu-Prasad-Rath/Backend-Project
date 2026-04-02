@@ -51,12 +51,12 @@ const decrementTweetLikes = async (tweetId) => {
   return await redisClient.decr(getTweetLikesKey(tweetId));
 };
 
-getTweetLikes = async(tweetId)=>{
+const getTweetLikes = async(tweetId)=>{
     const value = await redisClient.get(getTweetLikesKey(tweetId));
     return value ? parent(value) : null;
 }
 
-setTweetLikes = async(tweetId,count)=>{
+const setTweetLikes = async(tweetId,count)=>{
  await redisClient.set(getTweetLikesKey(tweetId,count));
 }
 
