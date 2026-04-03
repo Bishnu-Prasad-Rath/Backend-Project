@@ -18,10 +18,12 @@ import {
   getTweetLikes,
   setTweetLikes,
 } from "../redis/cache/like.cache.js";
+import { incrementLikes } from "../redis/cache/dashboard.cache.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-
+  const video = await Video.findById(videoId);
+  const channelId = video.owner;
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid video ID");
   }
@@ -49,22 +51,24 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     });
     action = "like";
 
+    await incrementLikes(channelId, "video");
+
     totalLikes = await incrementVideoLikes(videoId);
   }
 
-totalLikes = Number(totalLikes) || 0;
+  totalLikes = Number(totalLikes) || 0;
 
-if (totalLikes < 0) {
-  let redisLikes = await getVideoLikes(videoId);
+  if (totalLikes < 0) {
+    let redisLikes = await getVideoLikes(videoId);
 
-  if (redisLikes !== null) {
-    totalLikes = Number(redisLikes) || 0;
-  } else {
-    const dbCount = await Like.countDocuments({ video: videoId });
-    await setVideoLikes(videoId, dbCount);
-    totalLikes = dbCount;
+    if (redisLikes !== null) {
+      totalLikes = Number(redisLikes) || 0;
+    } else {
+      const dbCount = await Like.countDocuments({ video: videoId });
+      await setVideoLikes(videoId, dbCount);
+      totalLikes = dbCount;
+    }
   }
-}
   res
     .status(200)
     .json(
@@ -113,22 +117,24 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
     action = "like";
 
+    await incrementLikes(req.user._id, "comment");
+
     totalLikes = await incrementCommentLikes(commentId);
   }
 
-totalLikes = Number(totalLikes) || 0;
+  totalLikes = Number(totalLikes) || 0;
 
-if (totalLikes < 0) {
-  let redisLikes = await getCommentLikes(commentId);
+  if (totalLikes < 0) {
+    let redisLikes = await getCommentLikes(commentId);
 
-  if (redisLikes !== null) {
-    totalLikes = Number(redisLikes) || 0;
-  } else {
-    const dbCount = await Like.countDocuments({ comment: commentId });
-    await setCommentLikes(commentId, dbCount);
-    totalLikes = dbCount;
+    if (redisLikes !== null) {
+      totalLikes = Number(redisLikes) || 0;
+    } else {
+      const dbCount = await Like.countDocuments({ comment: commentId });
+      await setCommentLikes(commentId, dbCount);
+      totalLikes = dbCount;
+    }
   }
-}
 
   res
     .status(200)
@@ -177,22 +183,24 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     });
     action = "like";
 
+    await incrementLikes(req.user._id, "tweet");
+
     totalLikes = await incrementTweetLikes(tweetId);
   }
 
-totalLikes = Number(totalLikes) || 0;
+  totalLikes = Number(totalLikes) || 0;
 
-if (totalLikes < 0) {
-  let redisLikes = await getTweetLikes(tweetId);
+  if (totalLikes < 0) {
+    let redisLikes = await getTweetLikes(tweetId);
 
-  if (redisLikes !== null) {
-    totalLikes = Number(redisLikes) || 0;
-  } else {
-    const dbCount = await Like.countDocuments({ tweet: tweetId });
-    await setTweetLikes(tweetId, dbCount);
-    totalLikes = dbCount;
+    if (redisLikes !== null) {
+      totalLikes = Number(redisLikes) || 0;
+    } else {
+      const dbCount = await Like.countDocuments({ tweet: tweetId });
+      await setTweetLikes(tweetId, dbCount);
+      totalLikes = dbCount;
+    }
   }
-}
 
   res
     .status(200)

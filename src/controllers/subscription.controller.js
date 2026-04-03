@@ -3,8 +3,9 @@ import { Subscription } from "../models/subscription.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { addSubscription, removeSubscription, isSubscriberd, getSubscribersCount } from "../redis/cache/subscription.cache.js";
+import { addSubscription, removeSubscription, isSubscribed, getSubscribersCount } from "../redis/cache/subscription.cache.js";
 import {getIO} from "../socket/socketInstance.js";
+import {incrementSubscribers,decrementSubscribers} from "../redis/cache/dashboard.cache.js";
 
 const toggleSubscription = asyncHandler(async (req, res) => {
   const { channelId } = req.params;
@@ -32,6 +33,8 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     await removeSubscription(userId, channelId);
 
     action = "unsubscribe";
+
+    await decrementSubscribers(channelId);
   } else {
     subscription = await Subscription.create({
       subscriber: userId,
@@ -41,6 +44,8 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     await addSubscription(userId, channelId);
 
     action = "subscribe";
+
+    await incrementSubscribers(channelId);
   }
 
   // 🔥 Redis count
@@ -63,7 +68,7 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     totalSubscribers,
   })
 
-const isUserSubscribed = await isSubscriberd(userId, channelId);
+const isUserSubscribed = await isSubscribed(userId, channelId);
 
   return res.status(200).json(
     new ApiResponse(

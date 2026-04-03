@@ -1,64 +1,79 @@
 import { redisClient } from "../../config/redis.config.js";
 
-const getVideoLikesKey = (videoId) => `video:${videoId}:likes`;
-const getCommentLikesKey = (commentId) => `comment:${commentId}:likes`;
-const getTweetLikesKey = (tweetId) => `tweet:${tweetId}:likes`;
+import { CACHE_KEYS } from "./key.js";
 
 //Video
 
 const incrementVideoLikes = async (videoId) => {
-  return await redisClient.incr(getVideoLikesKey(videoId));
+  return await redisClient.incr(CACHE_KEYS.VIDEO_LIKES(videoId));
 };
 
 const decrementVideoLikes = async (videoId) => {
-  return await redisClient.decr(getVideoLikesKey(videoId));
+  const key = CACHE_KEYS.VIDEO_LIKES(videoId);
+  const current = await redisClient.get(key);
+
+  if (!current || Number(current) <= 0) return 0;
+
+  return await redisClient.decr(key);
 };
 
 const getVideoLikes = async (videoId) => {
-  const value = await redisClient.get(getVideoLikesKey(videoId));
-  return value ? parent(value) : null;
+  const value = await redisClient.get(CACHE_KEYS.VIDEO_LIKES(videoId));
+  return value ? Number(value) : 0;
 };
 
 const setVideoLikes = async (videoId, count) => {
-  await redisClient.set(getVideoLikesKey(videoId), count);
+  await redisClient.set(CACHE_KEYS.VIDEO_LIKES(videoId), count, { EX: 300 });
 };
 //Comment
 
 const incrementCommentLikes = async (commentId) => {
-  return await redisClient.incr(getCommentLikesKey(commentId));
+  return await redisClient.incr(CACHE_KEYS.COMMENT_LIKES(commentId));
 };
 
 const decrementCommentLikes = async (commentId) => {
-  return await redisClient.decr(getCommentLikesKey(commentId));
+  const key = CACHE_KEYS.COMMENT_LIKES(commentId);
+  const current = await redisClient.get(key);
+
+  if (!current || Number(current) <= 0) return 0;
+
+  return await redisClient.decr(key);
 };
 
 const getCommentLikes = async (commentId) => {
-    const value = await redisClient.get(getCommentLikesKey(commentId))
-    return value ? parent(value) : null;
-} 
+  const value = await redisClient.get(CACHE_KEYS.COMMENT_LIKES(commentId));
+  return value ? Number(value) : 0;
+};
 
-const setCommentLikes = async (commentId,count) => {
-await redisClient.set(getCommentLikesKey(commentId,count))
-}
+const setCommentLikes = async (commentId, count) => {
+  await redisClient.set(CACHE_KEYS.COMMENT_LIKES(commentId), count, {
+    EX: 300,
+  });
+};
 
 //Tweet
 
 const incrementTweetLikes = async (tweetId) => {
-  return await redisClient.incr(getTweetLikesKey(tweetId));
+  return await redisClient.incr(CACHE_KEYS.TWEET_LIKES(tweetId));
 };
 
 const decrementTweetLikes = async (tweetId) => {
-  return await redisClient.decr(getTweetLikesKey(tweetId));
+  const key = CACHE_KEYS.TWEET_LIKES(tweetId);
+  const current = await redisClient.get(key);
+
+  if (!current || Number(current) <= 0) return 0;
+  
+  return await redisClient.decr(key);
 };
 
-const getTweetLikes = async(tweetId)=>{
-    const value = await redisClient.get(getTweetLikesKey(tweetId));
-    return value ? parent(value) : null;
-}
+const getTweetLikes = async (tweetId) => {
+  const value = await redisClient.get(CACHE_KEYS.TWEET_LIKES(tweetId));
+  return value ? Number(value) : 0;
+};
 
-const setTweetLikes = async(tweetId,count)=>{
- await redisClient.set(getTweetLikesKey(tweetId,count));
-}
+const setTweetLikes = async (tweetId, count) => {
+  await redisClient.set(CACHE_KEYS.TWEET_LIKES(tweetId), count, { EX: 300 });
+};
 
 export {
   incrementVideoLikes,
@@ -72,5 +87,5 @@ export {
   incrementTweetLikes,
   decrementTweetLikes,
   getTweetLikes,
-  setTweetLikes
+  setTweetLikes,
 };

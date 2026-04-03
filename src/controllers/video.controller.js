@@ -10,6 +10,7 @@ import {
 } from "../utils/cloudinary.js";
 import { getCache,setCache,deleteCache } from "../redis/cache/base.cache.js";
 import {getVideoCache,setVideoCache,deleteVideoCache,getVideosCache,setVideosCache,deleteVideosCache} from  "../redis/cache/video.cache.js"
+import {incrementVideos,incrementViews} from '../redis/cache/dashboard.cache.js';
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -135,6 +136,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     duration: uploadedVideo.duration,
   });
 
+  await incrementVideos(req.user._id);
+
 await deleteCache("videos:all")
 
   return res
@@ -152,6 +155,13 @@ const getVideoById = asyncHandler(async (req, res) => {
   const cachedVideo = await getVideoCache(videoId);
 
   if(cachedVideo){
+
+await Video.findByIdAndUpdate(videoId, {
+  $inc: { views: 1 },
+});
+
+await incrementViews(cachedVideo.owner._id);
+
     return res
     .status(200)
     .json(new ApiResponse(
@@ -196,9 +206,15 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
-await Video.findByIdAndUpdate(videoId, {
-  $inc: { views: 1 },
-});
+  const videoData = video[0];
+
+  await Video.findByIdAndUpdate(videoId,{
+    $inc: { views: 1 },
+  })
+
+  await incrementViews(videoData.owner._id);
+
+  await setVideoCache(videoId, videoData);
 
 await deleteVideoCache(videoId);
 
@@ -278,7 +294,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
   await Video.findByIdAndDelete(videoId);
 
-await deleteVideoCache(videoId);
+// await deleteVideoCache(videoId);
 
 await deleteCache("videos:all")
 
