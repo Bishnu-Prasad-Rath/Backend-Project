@@ -59,6 +59,10 @@ const incrementLikes = async (userId) => {
   await redisClient.hIncrBy(DASHBOARD_KEY(userId), "totalLikes", 1);
 };
 
+const decrementLikes = async (userId) => {
+  await redisClient.hIncrBy(DASHBOARD_KEY(userId), "totalLikes", -1);
+}
+
 // +views
 const incrementViews = async (userId, count = 1) => {
   await redisClient.hIncrBy(DASHBOARD_KEY(userId), "totalViews", count);
@@ -73,4 +77,5 @@ export {
   incrementVideos,
   incrementLikes,
   incrementViews,
+  decrementLikes,
 };

@@ -11,6 +11,7 @@ import {
 import { getCache,setCache,deleteCache } from "../redis/cache/base.cache.js";
 import {getVideoCache,setVideoCache,deleteVideoCache,getVideosCache,setVideosCache,deleteVideosCache} from  "../redis/cache/video.cache.js"
 import {incrementVideos,incrementViews} from '../redis/cache/dashboard.cache.js';
+import {updateTrendingScore,getTrendingScore} from '../redis/cache/trending.cache.js';
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -162,6 +163,9 @@ await Video.findByIdAndUpdate(videoId, {
 
 await incrementViews(cachedVideo.owner._id);
 
+await updateTrendingScore(videoId, 2);
+
+
     return res
     .status(200)
     .json(new ApiResponse(
@@ -216,11 +220,37 @@ await incrementViews(cachedVideo.owner._id);
 
   await setVideoCache(videoId, videoData);
 
-await deleteVideoCache(videoId);
+await updateTrendingScore(videoId, 2);
 
   return res
     .status(200)
     .json(new ApiResponse(200, video[0], "Video fetched successfully"));
+});
+
+const getTrending = asyncHandler(async (req, res) => {
+  const videoIds = await getTrendingScore(10);
+
+  if(!videoIds.length){
+    return res
+    .status(200)
+    .json(new ApiResponse(200, [], "No trending videos found."));
+  }
+
+const videos = await Video.find({
+  _id: { $in: videoIds },
+});
+
+const videoMap = new Map(
+  videos.map((v) => [v._id.toString(), v])
+);
+
+const orderedVideos = videoIds.map((id) =>
+  videoMap.get(id.toString())
+);
+
+  return res
+  .status(200)
+  .json(new ApiResponse(200, orderedVideos, "trending videos fetched successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -343,4 +373,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
+  getTrending,
 };

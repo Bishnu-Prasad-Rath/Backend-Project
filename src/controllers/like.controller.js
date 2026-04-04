@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getIO } from "../socket/socketInstance.js";
+import { Video } from "../models/video.model.js";
 import {
   incrementVideoLikes,
   decrementVideoLikes,
@@ -18,15 +19,24 @@ import {
   getTweetLikes,
   setTweetLikes,
 } from "../redis/cache/like.cache.js";
-import { incrementLikes } from "../redis/cache/dashboard.cache.js";
+import { incrementLikes, decrementLikes } from "../redis/cache/dashboard.cache.js";
+import { getTrendingScore, updateTrendingScore } from "../redis/cache/trending.cache.js";
+import { log } from "console";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  const video = await Video.findById(videoId);
-  const channelId = video.owner;
-  if (!isValidObjectId(videoId)) {
+
+  if(!isValidObjectId(videoId)){
     throw new ApiError(400, "Invalid video ID");
   }
+
+  const video = await Video.findById(videoId);
+
+if(!video){
+  throw new ApiError(404, "Video not found");
+}
+
+  const channelId = video.owner;
 
   const existingLike = await Like.findOne({
     video: videoId,
@@ -42,18 +52,28 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
-
+    await decrementLikes(channelId, "video");
     totalLikes = await decrementVideoLikes(videoId);
+   try {
+     await updateTrendingScore(videoId, -3);
+     console.log(updateTrendingScore(videoId, -3));
+     
+   } catch (error) {
+      console.log("Trending update failed", error.message);
+   }
   } else {
     like = await Like.create({
       video: videoId,
       likedBy: req.user._id,
     });
     action = "like";
-
     await incrementLikes(channelId, "video");
-
     totalLikes = await incrementVideoLikes(videoId);
+try {
+  await updateTrendingScore(videoId, 3);
+} catch (err) {
+  console.log("Trending update failed", err.message);
+}
   }
 
   totalLikes = Number(totalLikes) || 0;

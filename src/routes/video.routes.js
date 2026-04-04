@@ -6,6 +6,7 @@ import {
   publishAVideo,
   togglePublishStatus,
   updateVideo,
+  getTrending,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -31,6 +32,10 @@ router
     ]),
     publishAVideo
   );
+
+    router
+  .route("/trending")
+  .get(rateLimitMiddleware({ windowSize: 10, maxRequests: 20 }), getTrending);
 
 router
   .route("/:videoId")

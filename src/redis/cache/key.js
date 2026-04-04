@@ -3,7 +3,7 @@
   VIDEO: (id) => `video:${id}`,
   VIDEOS: (params) =>
     `videos:page:${params.page}:limit:${params.limit}:query:${params.query}:sort:${params.sortBy}:${params.sortType}:user:${params.userId}`,
-
+  TRENDING_VIDEOS:()=> `videos:trending`,
   // 💬 COMMENTS
   VIDEO_COMMENTS: (videoId, page) =>
     `video:${videoId}:comments:page:${page}`,
