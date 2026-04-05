@@ -20,8 +20,8 @@ import {
   setTweetLikes,
 } from "../redis/cache/like.cache.js";
 import { incrementLikes, decrementLikes } from "../redis/cache/dashboard.cache.js";
-import { getTrendingScore, updateTrendingScore } from "../redis/cache/trending.cache.js";
-import { log } from "console";
+import { updateTrendingScore } from "../redis/cache/trending.cache.js";
+import { trendingQueue } from "../queues/trending.queue.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
@@ -55,9 +55,7 @@ if(!video){
     await decrementLikes(channelId, "video");
     totalLikes = await decrementVideoLikes(videoId);
    try {
-     await updateTrendingScore(videoId, -3);
-     console.log(updateTrendingScore(videoId, -3));
-     
+     await updateTrendingScore(videoId, -3);     
    } catch (error) {
       console.log("Trending update failed", error.message);
    }
@@ -70,8 +68,10 @@ if(!video){
     await incrementLikes(channelId, "video");
     totalLikes = await incrementVideoLikes(videoId);
 try {
-  await updateTrendingScore(videoId, 3);
-} catch (err) {
+await trendingQueue.add("updateScore", {
+  videoId,
+  weight: 3,
+});} catch (err) {
   console.log("Trending update failed", err.message);
 }
   }

@@ -1,32 +1,26 @@
-import { createClient } from "redis";
+import IORedis from "ioredis";
 
- const redisClient = createClient({
-  url: process.env.REDIS_URL, // optional but recommended
+const redisClient = new IORedis(process.env.REDIS_URL || "redis://127.0.0.1:6379");
+
+redisClient.on("connect", () => {
+  console.log("Redis is connecting...");
 });
 
-// ✅ handle errors
+redisClient.on("ready", () => {
+  console.log("✅ Redis is Ready.");
+});
+
 redisClient.on("error", (err) => {
-  console.log("Redis Error:", err);
+  console.log("❌ Redis Error:", err);
 });
 
-redisClient.on("connect",()=>{
-  console.log("Redis is Reconnecting");
-})
-
-redisClient.on("ready",()=>{
-  console.log("Redis is Ready.");
-})
-
-// ✅ connect function
- const connectRedis = async () => {
+const connectRedis = async () => {
   try {
-    if(!redisClient.isOpen) {
-      await redisClient.connect();
-    }
+    // ioredis auto-connects, no need for .connect()
     console.log("✅ Redis connected successfully");
   } catch (error) {
     console.log("❌ Redis connection failed:", error);
   }
 };
 
-export{redisClient,connectRedis}
+export { redisClient, connectRedis };
