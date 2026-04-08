@@ -42,43 +42,66 @@ const initSocket = (io) => {
     });
 
     socket.on("join:live", async (liveId) => {
-      socket.join(`live:${liveId}`);
+      try {
+        socket.join(`live:${liveId}`);
 
-      //  store liveId in socket (important)
-      socket.liveId = liveId;
-      //  increment viewers
-      const viewers = await redisClient.incr(`live:${liveId}:viewers`);
-      //  broadcast updated count
-      io.to(`live:${liveId}`).emit("live:viewers", viewers);
+        //  store liveId in socket (important)
+        socket.liveId = liveId;
+        //  increment viewers
+        const viewers = await redisClient.incr(`live:${liveId}:viewers`);
+        //  broadcast updated count
+        io.to(`live:${liveId}`).emit("live:viewers", viewers);
 
-      console.log(`👀 Viewer joined live ${liveId}: ${viewers}`);
+        console.log(`👀 Viewer joined live ${liveId}: ${viewers}`);
+      } catch (error) {
+        console.log("Socket join error : ", error.message);
+      }
     });
 
-    socket.on("live:message", ({ liveId, message, user }) => {
-      io.to(`live:${liveId}`).emit("live:message", {
-        message,
-        user,
-        createdAt: new Date(),
-      });
+    socket.on("live:message", async ({ liveId, message }) => {
+      try {
+        if (!liveId || !message) return;
+
+        const key = `chat:${socket.id}`;
+        const count = await redisClient.incr(key);
+
+        if (count === 1) {
+          await redisClient.expire(key, 10);
+        }
+
+        if (count > 10) return;
+
+        io.to(`live:${liveId}`).emit("live:message", {
+          message,
+          user: socket.user,
+          createdAt: new Date(),
+        });
+      } catch (error) {
+        console.log("Socket message error:", error.message);
+      }
     });
 
     socket.on("disconnect", async () => {
-      console.log("❌ Disconnected:", socket.id);
+      try {
+        console.log("❌ Disconnected:", socket.id);
 
-      if (socket.liveId) {
-        const key = `live:${socket.liveId}:viewers`;
+        if (socket.liveId) {
+          const key = `live:${socket.liveId}:viewers`;
 
-        let viewers = await redisClient.decr(key);
+          let viewers = await redisClient.decr(key);
 
-        // ✅ prevent negative
-        if (viewers < 0) {
-          viewers = 0;
-          await redisClient.set(key, 0);
+          // ✅ prevent negative
+          if (viewers < 0) {
+            viewers = 0;
+            await redisClient.set(key, 0);
+          }
+
+          io.to(`live:${socket.liveId}`).emit("live:viewers", viewers);
+
+          console.log(`❌ Viewer left live ${socket.liveId}: ${viewers}`);
         }
-
-        io.to(`live:${socket.liveId}`).emit("live:viewers", viewers);
-
-        console.log(`❌ Viewer left live ${socket.liveId}: ${viewers}`);
+      } catch (error) {
+        console.log("Socket disconnect error : ", error.message);
       }
     });
   });
