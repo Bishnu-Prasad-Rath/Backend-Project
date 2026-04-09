@@ -153,18 +153,28 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid video ID");
   }
 
-  const cachedVideo = await getVideoCache(videoId);
+  const videoDoc = await Video.findById(videoId);
 
-  if(cachedVideo){
+  if (!videoDoc) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  const ownerId = videoDoc.owner;
 
 await Video.findByIdAndUpdate(videoId, {
   $inc: { views: 1 },
 });
 
-await incrementViews(cachedVideo.owner._id);
+
+await incrementViews(ownerId);
 
 await updateTrendingScore(videoId, 2);
 
+  const cachedVideo = await getVideoCache(videoId);
+
+  if(cachedVideo){
+
+chachedVideo.views += 1;
 
     return res
     .status(200)
@@ -212,15 +222,7 @@ await updateTrendingScore(videoId, 2);
 
   const videoData = video[0];
 
-  await Video.findByIdAndUpdate(videoId,{
-    $inc: { views: 1 },
-  })
-
-  await incrementViews(videoData.owner._id);
-
   await setVideoCache(videoId, videoData);
-
-await updateTrendingScore(videoId, 2);
 
   return res
     .status(200)

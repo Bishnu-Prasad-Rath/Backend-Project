@@ -5,6 +5,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getIO } from "../socket/socketInstance.js";
 import { Video } from "../models/video.model.js";
+import { Comment } from "../models/comment.model.js";
+import { Tweet } from "../models/tweet.model.js";
 import {
   incrementVideoLikes,
   decrementVideoLikes,
@@ -99,7 +101,7 @@ await trendingQueue.add("updateScore", {
       )
     );
 
-  io.to(videoId).emit("video:like", {
+  io.to(`video:${videoId}`).emit("video:like", {
     videoId,
     userId: req.user._id,
     action,
@@ -128,6 +130,7 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
+    await decrementLikes(channelId, "comment");
     totalLikes = await decrementCommentLikes(commentId);
   } else {
     like = await Like.create({
@@ -137,7 +140,11 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 
     action = "like";
 
-    await incrementLikes(req.user._id, "comment");
+const comment = await Comment.findById(commentId);
+const channelId = comment.owner;
+
+    await incrementLikes(channelId, "comment");
+    await decrementLikes(channelId, "comment");
 
     totalLikes = await incrementCommentLikes(commentId);
   }
@@ -166,7 +173,7 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
       )
     );
 
-  io.to(commentId).emit("comment:like", {
+  io.to(`comment:${commentId}`).emit("comment:like", {
     commentId,
     userId: req.user._id,
     action,
@@ -195,6 +202,7 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
+    await decrementLikes(channelId, "tweet");
     totalLikes = await decrementTweetLikes(tweetId);
   } else {
     like = await Like.create({
@@ -203,7 +211,11 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     });
     action = "like";
 
-    await incrementLikes(req.user._id, "tweet");
+    const tweet = await Tweet.findById(tweetId);
+    const channelId = tweet.owner;
+
+    await incrementLikes(channelId, "tweet");
+    await decrementLikes(channelId, "tweet");
 
     totalLikes = await incrementTweetLikes(tweetId);
   }
@@ -232,7 +244,7 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
       )
     );
 
-  io.to(tweetId).emit("tweet:like", {
+  io.to(`tweet:${tweetId}`).emit("tweet:like", {
     tweetId,
     userId: req.user._id,
     action,
