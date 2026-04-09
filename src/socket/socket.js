@@ -1,3 +1,5 @@
+import { redisClient } from "../config/redis.config.js";
+
 const initSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("⚡ Connected:", socket.id);

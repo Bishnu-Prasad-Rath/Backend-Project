@@ -23,7 +23,7 @@ const getVideoLikes = async (videoId) => {
 };
 
 const setVideoLikes = async (videoId, count) => {
-  await redisClient.set(CACHE_KEYS.VIDEO_LIKES(videoId), count, { EX: 300 });
+  await redisClient.set(CACHE_KEYS.VIDEO_LIKES(videoId), count, "EX", 300);
 };
 //Comment
 
@@ -46,9 +46,7 @@ const getCommentLikes = async (commentId) => {
 };
 
 const setCommentLikes = async (commentId, count) => {
-  await redisClient.set(CACHE_KEYS.COMMENT_LIKES(commentId), count, {
-    EX: 300,
-  });
+  await redisClient.set(CACHE_KEYS.COMMENT_LIKES(commentId), count, "EX", 300);
 };
 
 //Tweet
@@ -72,7 +70,7 @@ const getTweetLikes = async (tweetId) => {
 };
 
 const setTweetLikes = async (tweetId, count) => {
-  await redisClient.set(CACHE_KEYS.TWEET_LIKES(tweetId), count, { EX: 300 });
+  await redisClient.set(CACHE_KEYS.TWEET_LIKES(tweetId), count, "EX", 300);
 };
 
 export {

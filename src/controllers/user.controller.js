@@ -5,7 +5,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose"
-import cloudinary from "cloudinary"
+import {v2 as cloudinary} from "cloudinary"
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -59,7 +59,7 @@ const registerUser = asyncHandler(async (req, res) => {
   if (
     req.files &&
     Array.isArray(req.files.coverImage) &&
-    req.files.coverImage.length === 0
+    req.files.coverImage.length > 0
   ) {
     coverImageLocalPath = req.files?.coverImage[0].path;
   }
@@ -94,7 +94,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(200, createdUser, "User created successfully"));
+    .json(new ApiResponse(201, createdUser, "User created successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -157,8 +157,6 @@ const loginUser = asyncHandler(async (req, res) => {
         200,
         {
           user: loggedInUser,
-          accessToken,
-          refreshToken,
         },
         "User logged in successfully"
       )
@@ -217,22 +215,22 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
     };
 
-    const { accessToken, newrefreshToken } =
+    const { accessToken, refreshToken : newRefreshToken } =
       await generateAccessAndRefreshToken(user._id);
 
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", newrefreshToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
       .json(
         new ApiResponse(
           200,
           {
             accessToken,
-            refreshToken: newrefreshToken,
+            refreshToken: newRefreshToken,
           },
           "Access token refreshed successfully"
         )
@@ -245,7 +243,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
-  const user = User.findById(req.user?._id);
+  const user = await User.findById(req.user?._id);
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
 
   if (!isPasswordCorrect) {
@@ -257,11 +255,11 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Password changed successfully"));
+    .json(new ApiResponse(200,{}, "Password changed successfully"));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  return res.status(200).json(200, req.user, "User fetched successfully");
+  return res.status(200).json(new ApiResponse(200, req.user, "User fetched successfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -308,12 +306,12 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   // 🚀 Upload new avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-  if (!avatar?.secure_url) {
+  if (!avatar.url) {
     throw new ApiError(400, "Uploading avatar failed");
   }
 
   // 💾 Update user
-  user.avatar = avatar.secure_url;
+  user.avatar = avatar.url;
   await user.save({ validateBeforeSave: false });
 
   // 🧨 Delete old avatar AFTER successful save
@@ -397,7 +395,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
         },
         isSubscribed : {
           $cond : {
-            if : {$in : [req.User?._id,"$subscribers.subscriber"]},
+            if : {$in : [req.user?._id,"$subscribers.subscriber"]},
             then : true,
             else : false
           }

@@ -5,7 +5,7 @@ import { Video } from "../../models/video.model.js";
 const TRENDING_KEY = CACHE_KEYS.TRENDING_VIDEOS();
 
 const getTrendingScore = async (limit = 10) => {
-  return await redisClient.zRange(
+  return await redisClient.zrevrange(
     TRENDING_KEY,
     0,
     limit - 1,
