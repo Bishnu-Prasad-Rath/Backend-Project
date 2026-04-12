@@ -7,8 +7,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 const createPlaylist = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
 
-  if (!name) {
-    throw new ApiError(400, "Playlist name is required.");
+  if (!name || !description) {
+    throw new ApiError(400, "Name and description are required.");
   }
 
   const playlist = await Playlist.create({
@@ -58,7 +58,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     });
 
   if (!playlist) {
-    throw new ApiError(400, "Playlist not found");
+    throw new ApiError(404, "Playlist not found");
   }
 
   return res

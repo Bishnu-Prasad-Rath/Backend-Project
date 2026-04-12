@@ -5,12 +5,7 @@ import { Video } from "../../models/video.model.js";
 const TRENDING_KEY = CACHE_KEYS.TRENDING_VIDEOS();
 
 const getTrendingScore = async (limit = 10) => {
-  return await redisClient.zrevrange(
-    TRENDING_KEY,
-    0,
-    limit - 1,
-    { WITHSCORES: true }
-  );
+return await redisClient.zrevrange(TRENDING_KEY, 0, limit - 1, "WITHSCORES");
 };
 
 const updateTrendingScore = async (videoId, weight) => {
@@ -30,11 +25,7 @@ const updateTrendingScore = async (videoId, weight) => {
 
     console.log("🔥 ADV SCORE:", videoId, score);
 
-    await redisClient.zIncrBy(
-      TRENDING_KEY,
-      score,
-      videoId.toString()
-    );
+await redisClient.zincrby(TRENDING_KEY, score, videoId.toString());
 
   } catch (err) {
     console.error("Trending error:", err.message);

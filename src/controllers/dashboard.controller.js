@@ -21,7 +21,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
         new ApiResponse(
           200,
           cachedData,
-          "Dashboard fetched from teh data"
+          "Dashboard fetched from successfully."
         )
       );
   }

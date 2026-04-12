@@ -127,6 +127,10 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   let like;
   let totalLikes;
 
+const comment = await Comment.findById(commentId);
+if (!comment) throw new ApiError(404, "Comment not found");
+const channelId = comment.owner;
+
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
@@ -144,8 +148,6 @@ const comment = await Comment.findById(commentId);
 const channelId = comment.owner;
 
     await incrementLikes(channelId, "comment");
-    await decrementLikes(channelId, "comment");
-
     totalLikes = await incrementCommentLikes(commentId);
   }
 
@@ -215,8 +217,6 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     const channelId = tweet.owner;
 
     await incrementLikes(channelId, "tweet");
-    await decrementLikes(channelId, "tweet");
-
     totalLikes = await incrementTweetLikes(tweetId);
   }
 

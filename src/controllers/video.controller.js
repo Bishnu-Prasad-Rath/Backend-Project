@@ -94,7 +94,7 @@ let cachedVideos = null;
   ]);
 
   if (!videos.length) {
-    throw new ApiError(404, "Videos not found");
+    throw new ApiError(404,[], "Videos not found");
   }
 
   await setVideosCache(params,videos);
@@ -174,7 +174,7 @@ await updateTrendingScore(videoId, 2);
 
   if(cachedVideo){
 
-chachedVideo.views += 1;
+cachedVideo.views += 1;
 
     return res
     .status(200)
@@ -326,7 +326,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
   await Video.findByIdAndDelete(videoId);
 
-// await deleteVideoCache(videoId);
+await deleteVideoCache(videoId);
 
 await deleteCache("videos:all")
 

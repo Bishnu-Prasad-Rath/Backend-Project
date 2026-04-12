@@ -4,9 +4,9 @@ const rateLimiter = async ({ key, windowSize = 10, maxRequests = 10 }) => {
   const now = Date.now();
   const windowStart = now - windowSize * 1000;
 
-  await redisClient.zRemRangeByScore(key, 0, windowStart);
+  await redisClient.zremrangebyscore(key, 0, windowStart);
 
-  const currentRequest = await redisClient.zCard(key);
+  const currentRequest = await redisClient.zcard(key);
 
   if (currentRequest >= maxRequests) {
     return {
@@ -16,10 +16,7 @@ const rateLimiter = async ({ key, windowSize = 10, maxRequests = 10 }) => {
     };
   }
 
-  await redisClient.zAdd(key, {
-    score: now,
-    value: `${now}-${Math.random()}`,
-  });
+await redisClient.zadd(key, now, `${now}-${Math.random()}`);
 
   await redisClient.expire(key, windowSize);
 
