@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
+import path from "path";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,20 +9,25 @@ cloudinary.config({
 });
 
 const uploadOnCloudinary = async (localFilePath) => {
+  let normalizedPath;
   try {
     if (!localFilePath) return null;
-    const response = await cloudinary.uploader.upload(localFilePath, {
+    normalizedPath = path.normalize(localFilePath);
+    
+    const response = await cloudinary.uploader.upload(normalizedPath, {
       ///Upload the file on cloudinary
       resource_type: "auto",
     });
     console.log("Upload Result:", response);
     //File has been uploaded successfully, now we can remove the file from local storage
-    if (fs.existsSync(localFilePath)) {
-      fs.unlinkSync(localFilePath);
+    if (fs.existsSync(normalizedPath)) {
+      fs.unlinkSync(normalizedPath);
     }
     return response;
   } catch (error) {
-    fs.unlinkSync(localFilePath); // remove the locally saved temp file in case of an error as well
+    if (normalizedPath && fs.existsSync(normalizedPath)) {
+      fs.unlinkSync(normalizedPath); // remove the locally saved temp file in case of an error as well
+    }
     console.log("Error uploading to Cloudinary:", error);
     return null;
   }

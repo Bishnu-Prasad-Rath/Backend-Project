@@ -12,6 +12,7 @@
   VIDEO_LIKES: (videoId) => `video:${videoId}:likes`,
   COMMENT_LIKES: (commentId) => `comment:${commentId}:likes`,
   TWEET_LIKES: (tweetId) => `tweet:${tweetId}:likes`,
+  LIVE_LIKES: (liveId) => `live:${liveId}:likes`,
 
   // 📊 DASHBOARD
   DASHBOARD: (userId) => `user:${userId}:dashboard`,

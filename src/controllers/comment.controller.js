@@ -72,17 +72,39 @@ const addComment = asyncHandler(async (req, res) => {
 
   await deleteCommentsCache(videoId);
 
-  const io = getIO();
-  io.to(videoId).emit("comment:new", {
-    videoId,
-    comment,
-  });
+  getIO().to(videoId).emit('comment:new', comment);
 
   return res
     .status(201)
     .json(
       new ApiResponse(201, comment, "Comment on video created successfully.")
     );
+});
+
+const addTweetComment = asyncHandler(async (req, res) => {
+  const { tweetId } = req.params;
+  const { content } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(tweetId)) {
+    throw new ApiError(400, "Invalid TweetId");
+  }
+
+  if (!content) {
+    throw new ApiError(400, "Content is required");
+  }
+
+  const comment = await Comment.create({
+    content,
+    tweet: tweetId,
+    owner: req.user._id,
+  });
+
+  const populatedComment = await Comment.findById(comment._id).populate("owner", "username avatar fullName");
+  getIO().emit('new:reply', populatedComment);
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, comment, "Reply added successfully"));
 });
 
 const updateComment = asyncHandler(async (req, res) => {
@@ -144,4 +166,4 @@ const deleteComment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, comment, "Comment deleted successfully"));
 });
 
-export { getVideoComments, addComment, updateComment, deleteComment };
+export { getVideoComments, addComment, addTweetComment, updateComment, deleteComment };

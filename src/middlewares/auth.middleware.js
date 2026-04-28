@@ -6,7 +6,6 @@ import { User } from "../models/user.model.js";
 // Start timer for JWT verification
 
 export const verifyJWT = asyncHandler(async (req, _, next) => {
-  console.time("JWT_VERIFICATION");
   try {
     const token =
       req.cookies?.accessToken ||
@@ -33,7 +32,6 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
   } catch (error) {
     throw new ApiError(401, error?.message || "Invalid access-token");
   }
-  console.timeEnd("JWT_VERIFICATION");
 });
 
 // End timer for JWT verification

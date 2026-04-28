@@ -15,6 +15,8 @@ const getDashboardCache = async (userId) => {
     totalVideos: Number(data.totalVideos),
     totalViews: Number(data.totalViews),
     totalLikes: Number(data.totalLikes),
+    topTweets: data.topTweets ? JSON.parse(data.topTweets) : [],
+    performanceGraph: data.performanceGraph ? JSON.parse(data.performanceGraph) : [],
   };
 };
 
@@ -27,6 +29,8 @@ const setDashboardCache = async (userId, data) => {
     totalVideos: data.totalVideos,
     totalViews: data.totalViews,
     totalLikes: data.totalLikes,
+    topTweets: JSON.stringify(data.topTweets || []),
+    performanceGraph: JSON.stringify(data.performanceGraph || []),
   });
 
   await redisClient.expire(key, 300); // 5 min TTL

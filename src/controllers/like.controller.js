@@ -7,6 +7,7 @@ import { getIO } from "../socket/socketInstance.js";
 import { Video } from "../models/video.model.js";
 import { Comment } from "../models/comment.model.js";
 import { Tweet } from "../models/tweet.model.js";
+import { Live } from "../models/live.model.js";
 import {
   incrementVideoLikes,
   decrementVideoLikes,
@@ -20,6 +21,10 @@ import {
   setCommentLikes,
   getTweetLikes,
   setTweetLikes,
+  incrementLiveLikes,
+  decrementLiveLikes,
+  getLiveLikes,
+  setLiveLikes,
 } from "../redis/cache/like.cache.js";
 import { incrementLikes, decrementLikes } from "../redis/cache/dashboard.cache.js";
 import { updateTrendingScore } from "../redis/cache/trending.cache.js";
@@ -195,6 +200,45 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
     likedBy: req.user._id,
   });
 
+  let isLiked = false;
+
+  if (existingLike) {
+    await Like.findByIdAndDelete(existingLike._id);
+    isLiked = false;
+  } else {
+    await Like.create({
+      tweet: tweetId,
+      likedBy: req.user._id,
+    });
+    isLiked = true;
+  }
+
+  // Real-time pure DB count
+  const totalLikes = await Like.countDocuments({ tweet: tweetId });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { isLiked, action: isLiked ? "like" : "unlike", totalLikes },
+        isLiked ? "Tweet liked" : "Tweet unliked"
+      )
+    );
+});
+
+const toggleLiveLike = asyncHandler(async (req, res) => {
+  const { liveId } = req.params;
+
+  if (!isValidObjectId(liveId)) {
+    throw new ApiError(400, "Invalid live ID");
+  }
+
+  const existingLike = await Like.findOne({
+    live: liveId,
+    likedBy: req.user._id,
+  });
+
   const io = getIO();
 
   let action;
@@ -204,32 +248,27 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
     action = "unlike";
-    await decrementLikes(channelId, "tweet");
-    totalLikes = await decrementTweetLikes(tweetId);
+    totalLikes = await decrementLiveLikes(liveId);
   } else {
     like = await Like.create({
-      tweet: tweetId,
+      live: liveId,
       likedBy: req.user._id,
     });
     action = "like";
 
-    const tweet = await Tweet.findById(tweetId);
-    const channelId = tweet.owner;
-
-    await incrementLikes(channelId, "tweet");
-    totalLikes = await incrementTweetLikes(tweetId);
+    totalLikes = await incrementLiveLikes(liveId);
   }
 
   totalLikes = Number(totalLikes) || 0;
 
   if (totalLikes < 0) {
-    let redisLikes = await getTweetLikes(tweetId);
+    let redisLikes = await getLiveLikes(liveId);
 
     if (redisLikes !== null) {
       totalLikes = Number(redisLikes) || 0;
     } else {
-      const dbCount = await Like.countDocuments({ tweet: tweetId });
-      await setTweetLikes(tweetId, dbCount);
+      const dbCount = await Like.countDocuments({ live: liveId });
+      await setLiveLikes(liveId, dbCount);
       totalLikes = dbCount;
     }
   }
@@ -240,12 +279,12 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         { like, action, totalLikes },
-        action === "like" ? "tweet liked" : "tweet unliked"
+        action === "like" ? "Live liked" : "Live unliked"
       )
     );
 
-  io.to(`tweet:${tweetId}`).emit("tweet:like", {
-    tweetId,
+  io.to(`live:${liveId}`).emit("live:like", {
+    liveId,
     userId: req.user._id,
     action,
     totalLikes,
@@ -274,4 +313,4 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     );
 });
 
-export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos };
+export { toggleCommentLike, toggleTweetLike, toggleVideoLike, toggleLiveLike, getLikedVideos };

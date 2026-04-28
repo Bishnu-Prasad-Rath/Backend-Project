@@ -5,13 +5,13 @@ const initSocket = (io) => {
     console.log("⚡ Connected:", socket.id);
 
     // 🎥 Video Room
-    socket.on("join:video", (videoId) => {
-      socket.join(`video:${videoId}`);
-      console.log(`User joined video room: ${videoId}`);
+    socket.on("join-room", (roomId) => {
+      socket.join(roomId);
+      console.log(`User joined room: ${roomId}`);
     });
 
-    socket.on("leave:video", (videoId) => {
-      socket.leave(`video:${videoId}`);
+    socket.on("leave-room", (roomId) => {
+      socket.leave(roomId);
     });
 
     socket.on("joinChannel", (channelId) => {
@@ -43,7 +43,7 @@ const initSocket = (io) => {
       socket.leave(`tweet:${tweetId}`);
     });
 
-    socket.on("join:live", async (liveId) => {
+    socket.on("join-live", async (liveId) => {
       try {
         socket.join(`live:${liveId}`);
 
@@ -60,7 +60,7 @@ const initSocket = (io) => {
       }
     });
 
-    socket.on("live:message", async ({ liveId, message }) => {
+    socket.on("chat-message", async ({ liveId, message }) => {
       try {
         if (!liveId || !message) return;
 
@@ -73,7 +73,7 @@ const initSocket = (io) => {
 
         if (count > 10) return;
 
-        io.to(`live:${liveId}`).emit("live:message", {
+        io.to(`live:${liveId}`).emit("new-message", {
           message,
           user: socket.user,
           createdAt: new Date(),

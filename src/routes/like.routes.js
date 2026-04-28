@@ -4,6 +4,7 @@ import {
   toggleCommentLike,
   toggleVideoLike,
   toggleTweetLike,
+  toggleLiveLike,
 } from "../controllers/like.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { rateLimitMiddleware } from "../middlewares/rateLimit.middleware.js";
@@ -28,6 +29,12 @@ router
   .post(
     rateLimitMiddleware({ windowSize: 10, maxRequests: 10 }),
     toggleTweetLike
+  );
+router
+  .route("/toggle/l/:liveId")
+  .post(
+    rateLimitMiddleware({ windowSize: 10, maxRequests: 10 }),
+    toggleLiveLike
   );
 router
   .route("/videos")

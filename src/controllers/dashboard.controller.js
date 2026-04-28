@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Video } from "../models/video.model.js";
 import { Subscription } from "../models/subscription.model.js";
 import { Like } from "../models/like.model.js";
+import { Tweet } from "../models/tweet.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {
@@ -54,11 +55,34 @@ const getChannelStats = asyncHandler(async (req, res) => {
 
   const totalViews = totalViewsAgg[0]?.totalViews || 0;
 
+  // Gather Top Tweets
+  const tweets = await Tweet.find({ owner: channelId }).lean();
+  const tweetsWithLikes = await Promise.all(
+    tweets.map(async (t) => {
+      const count = await Like.countDocuments({ tweet: t._id });
+      return { ...t, likes: count };
+    })
+  );
+  const topTweets = tweetsWithLikes.sort((a, b) => b.likes - a.likes).slice(0, 5);
+
+  // Performance Graph Logic
+  const recentVideos = await Video.find({ owner: channelId })
+    .sort({ createdAt: -1 })
+    .limit(7)
+    .lean();
+    
+  const performanceGraph = recentVideos.reverse().map(v => ({
+    name: v.title.substring(0, 15) + (v.title.length > 15 ? '...' : ''),
+    views: v.views
+  }));
+
   const responseData = {
     totalSubscribers,
     totalVideos,
     totalViews,
     totalLikes,
+    topTweets,
+    performanceGraph,
   };
 
   await setDashboardCache(channelId, responseData);

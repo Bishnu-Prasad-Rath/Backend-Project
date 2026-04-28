@@ -51,8 +51,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
   console.log(req.files);
 
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
   let coverImageLocalPath;
 
@@ -89,7 +89,7 @@ const registerUser = asyncHandler(async (req, res) => {
   );
 
   if (!createdUser) {
-    throw new ApiError(500, "Sometyhing went wrong when creating user");
+    throw new ApiError(500, "Something went wrong when creating user");
   }
 
   return res
