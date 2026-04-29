@@ -1,4 +1,5 @@
 import { Live } from "../models/live.model.js";
+import { User } from "../models/user.model.js";
 import { isValidObjectId } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -27,7 +28,7 @@ const isStreamer = live.streamer.toString() === req.user._id.toString();
 let token;
 
    try {
-   token = createLiveToken(liveId, req.user,isStreamer);
+   token = await createLiveToken(liveId, req.user,isStreamer);
    } catch (error) {
     throw new ApiError(500, "Error generating live token");
    }
@@ -44,23 +45,40 @@ const startLive = asyncHandler(async (req, res) => {
      throw new ApiError(400, "Title is required to start a live stream");
   }
 
-  const existingLive = await Live.findOne({
-    streamer: req.user._id,
-    isLive: true,
-  })
-
-  if(existingLive){
-    throw new ApiError(400, "You already have an active live stream");
+  let existingLive = null;
+  try {
+    existingLive = await Live.findOne({
+      streamer: req.user._id,
+      isActive: true,
+    });
+  } catch (error) {
+    console.error("Collection might not be initialized or query failed:", error.message);
   }
 
-  const live = await Live.create({
+  // Self-healing: if an old stream is stuck active, shut it down natively instead of erroring
+  if(existingLive){
+    existingLive.isLive = false;
+    existingLive.isActive = false;
+    existingLive.duration = Math.floor((Date.now() - new Date(existingLive.createdAt).getTime()) / 1000);
+    await existingLive.save();
+  }
+
+  const newLive = new Live({
     streamer: req.user._id,
     title,
+    isLive: true,
+    isActive: true
   });
+
+  const savedLive = await newLive.save();
+  const confirmedDoc = await Live.findById(savedLive._id);
+  console.log('Document confirmed in DB:', confirmedDoc);
+
+  await User.findByIdAndUpdate(req.user._id, { isLive: true });
 
   return res
     .status(201)
-    .json(new ApiResponse(201, live, "Live stream started successfully"));
+    .json(new ApiResponse(201, savedLive, "Live stream started successfully"));
 });
 
 const endLive = asyncHandler(async (req, res) => {
@@ -84,8 +102,18 @@ if (live.streamer.toString() !== req.user._id.toString()) {
   throw new ApiError(403, "You are not authorized to end this live stream");
 }
 
-live.isLive = false;
-await live.save();
+const updatedLive = await Live.findByIdAndUpdate(
+  liveId,
+  { isLive: false, isActive: false, viewers: 0 },
+  { returnDocument: 'after' }
+);
+
+await User.findByIdAndUpdate(req.user._id, { isLive: false });
+
+if (updatedLive) {
+  updatedLive.duration = Math.floor((Date.now() - new Date(updatedLive.createdAt).getTime()) / 1000);
+  await updatedLive.save();
+}
 
   return res
     .status(200)
@@ -94,7 +122,7 @@ await live.save();
 
 const getLiveStreams = asyncHandler(async (req, res) => {
   const lives = await Live.find({
-    isLive: true,
+    isActive: true,
   }).populate("streamer", "username avatar");
 
   return res
@@ -130,10 +158,24 @@ const getLiveById = asyncHandler(async (req, res) => {
 });
 
 
+const cleanupZombieStreams = asyncHandler(async (req, res) => {
+  const result = await Live.updateMany(
+    { streamer: req.user._id, isLive: true },
+    { $set: { isLive: false, isActive: false } }
+  );
+
+  await User.findByIdAndUpdate(req.user._id, { isLive: false });
+
+  return res.status(200).json(
+    new ApiResponse(200, result, `Zombie streams cleaned successfully. Modified: ${result.modifiedCount}`)
+  );
+});
+
 export {
     getLiveToken,
     startLive,
     endLive,
     getLiveStreams,
-    getLiveById
+    getLiveById,
+    cleanupZombieStreams
 }

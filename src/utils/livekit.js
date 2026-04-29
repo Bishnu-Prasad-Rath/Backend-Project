@@ -1,6 +1,6 @@
 import { AccessToken } from "livekit-server-sdk";
 
-const createLiveToken = (roomName, user, isStreamer) => {
+const createLiveToken = async (roomName, user, isStreamer) => {
     const at = new AccessToken(
         process.env.LIVEKIT_API_KEY,
         process.env.LIVEKIT_API_SECRET,
@@ -13,11 +13,11 @@ const createLiveToken = (roomName, user, isStreamer) => {
     at.addGrant({
         roomJoin: true,
         room: roomName,
-        canPublish: isStreamer,
+        canPublish: true,
         canSubscribe: true,
     })
 
-    return at.toJwt();
+    return await at.toJwt();
 }
 
 export {

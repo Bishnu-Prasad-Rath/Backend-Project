@@ -7,6 +7,7 @@ import {
   togglePublishStatus,
   updateVideo,
   getTrending,
+  getSubscribedFeed,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -36,6 +37,10 @@ router
     router
   .route("/trending")
   .get(rateLimitMiddleware({ windowSize: 10, maxRequests: 20 }), getTrending);
+
+router
+  .route("/subscribed-feed")
+  .get(rateLimitMiddleware({ windowSize: 10, maxRequests: 20 }), getSubscribedFeed);
 
 router
   .route("/:videoId")

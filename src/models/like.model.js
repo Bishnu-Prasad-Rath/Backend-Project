@@ -13,6 +13,10 @@ const likeSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Tweet"
   },
+  live: {
+    type: Schema.Types.ObjectId,
+    ref: "Live"
+  },
   likedBy: {
     type: Schema.Types.ObjectId,
     ref: "User",
@@ -33,6 +37,11 @@ likeSchema.index(
 likeSchema.index(
   { likedBy: 1, comment: 1 },
   { unique: true, partialFilterExpression: { comment: { $exists: true } } }
+)
+
+likeSchema.index(
+  { likedBy: 1, live: 1 },
+  { unique: true, partialFilterExpression: { live: { $exists: true } } }
 )
 
 const Like = mongoose.model("Like", likeSchema)

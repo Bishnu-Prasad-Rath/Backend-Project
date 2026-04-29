@@ -3,6 +3,7 @@ import {
   createTweet,
   deleteTweet,
   getUserTweets,
+  getAllTweets,
   updateTweet,
 } from "../controllers/tweet.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -14,6 +15,9 @@ router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 router
   .route("/")
   .post(rateLimitMiddleware({ windowSize: 60, maxRequests: 5 }), createTweet);
+router
+  .route("/all")
+  .get(rateLimitMiddleware({ windowSize: 10, maxRequests: 25 }), getAllTweets);
 router
   .route("/user/:userId")
   .get(rateLimitMiddleware({ windowSize: 10, maxRequests: 25 }), getUserTweets);

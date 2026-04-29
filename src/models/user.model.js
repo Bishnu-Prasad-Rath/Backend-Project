@@ -29,6 +29,10 @@ const userSchema = new Schema(
     type: Number,
     default: 0
   },
+    isLive: {
+      type: Boolean,
+      default: false
+    },
     avatar: {
       type: String,
       required: true, //cloudinary url

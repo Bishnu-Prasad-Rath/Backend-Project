@@ -73,6 +73,30 @@ const setTweetLikes = async (tweetId, count) => {
   await redisClient.set(CACHE_KEYS.TWEET_LIKES(tweetId), count, "EX", 300);
 };
 
+//Live
+
+const incrementLiveLikes = async (liveId) => {
+  return await redisClient.incr(CACHE_KEYS.LIVE_LIKES(liveId));
+};
+
+const decrementLiveLikes = async (liveId) => {
+  const key = CACHE_KEYS.LIVE_LIKES(liveId);
+  const current = await redisClient.get(key);
+
+  if (!current || Number(current) <= 0) return 0;
+  
+  return await redisClient.decr(key);
+};
+
+const getLiveLikes = async (liveId) => {
+  const value = await redisClient.get(CACHE_KEYS.LIVE_LIKES(liveId));
+  return value ? Number(value) : 0;
+};
+
+const setLiveLikes = async (liveId, count) => {
+  await redisClient.set(CACHE_KEYS.LIVE_LIKES(liveId), count, "EX", 300);
+};
+
 export {
   incrementVideoLikes,
   decrementVideoLikes,
@@ -86,4 +110,8 @@ export {
   decrementTweetLikes,
   getTweetLikes,
   setTweetLikes,
+  incrementLiveLikes,
+  decrementLiveLikes,
+  getLiveLikes,
+  setLiveLikes,
 };

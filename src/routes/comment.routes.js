@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   addComment,
+  addTweetComment,
   deleteComment,
   getVideoComments,
   updateComment,
@@ -20,6 +21,9 @@ router
   )
   .post(rateLimitMiddleware({ windowSize: 60, maxRequests: 10 }),
   addComment);
+router
+  .route("/t/:tweetId")
+  .post(rateLimitMiddleware({ windowSize: 60, maxRequests: 10 }), addTweetComment);
 router
   .route("/c/:commentId")
   .delete(

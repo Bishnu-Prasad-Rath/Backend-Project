@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose"
 import {v2 as cloudinary} from "cloudinary"
+import { getCache, setCache } from "../redis/cache/base.cache.js";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -51,8 +52,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
   console.log(req.files);
 
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
   let coverImageLocalPath;
 
@@ -89,7 +90,7 @@ const registerUser = asyncHandler(async (req, res) => {
   );
 
   if (!createdUser) {
-    throw new ApiError(500, "Sometyhing went wrong when creating user");
+    throw new ApiError(500, "Something went wrong when creating user");
   }
 
   return res
@@ -363,6 +364,13 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
     throw new ApiError(400,"Username is missing.")
   }
 
+  const cacheKey = `profile:${username.toLowerCase()}:viewer:${req.user?._id || 'guest'}`;
+  const cachedProfile = await getCache(cacheKey);
+
+  if (cachedProfile) {
+    return res.status(200).json(new ApiResponse(200, JSON.parse(cachedProfile), "Channel fetched from cache"));
+  }
+
   const channel = await User.aggregate([
     {
     $match : {
@@ -419,6 +427,8 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
  if(!channel?.length){
   throw new ApiError(404,"Channel does not exists")
  }
+
+  await setCache(cacheKey, JSON.stringify(channel[0]), 300); // 5 minutes TTL
 
 return res
 .status(200)

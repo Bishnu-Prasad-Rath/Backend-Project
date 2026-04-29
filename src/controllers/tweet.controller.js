@@ -1,5 +1,6 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Tweet } from "../models/tweet.model.js";
+import { Like } from "../models/like.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -29,11 +30,43 @@ const getUserTweets = asyncHandler(async (req, res) => {
   }
 
     const tweets = await Tweet.find({ owner: userId })
-        .sort({ createdAt: -1 });
+        .populate("owner", "username fullName avatar")
+        .populate({ path: "replies", populate: { path: "owner", select: "username avatar fullName" } })
+        .sort({ createdAt: -1 })
+        .lean();
+
+    const tweetsWithLikes = await Promise.all(
+      tweets.map(async (tweet) => {
+        const totalLikes = await Like.countDocuments({ tweet: tweet._id });
+        const isLiked = req.user ? await Like.exists({ tweet: tweet._id, likedBy: req.user._id }) : false;
+        return { ...tweet, totalLikes, isLiked: !!isLiked };
+      })
+    );
 
   return res
     .status(200)
-    .json(new ApiResponse(200,tweets, "Tweets fetched successfully"));
+    .json(new ApiResponse(200, tweetsWithLikes, "Tweets fetched successfully"));
+});
+
+const getAllTweets = asyncHandler(async (req, res) => {
+  const tweets = await Tweet.find()
+      .populate("owner", "username fullName avatar")
+      .populate({ path: "replies", populate: { path: "owner", select: "username avatar fullName" } })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+  const tweetsWithLikes = await Promise.all(
+    tweets.map(async (tweet) => {
+      const totalLikes = await Like.countDocuments({ tweet: tweet._id });
+      const isLiked = req.user ? await Like.exists({ tweet: tweet._id, likedBy: req.user._id }) : false;
+      return { ...tweet, totalLikes, isLiked: !!isLiked };
+    })
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, tweetsWithLikes, "All tweets fetched successfully"));
 });
 
 const updateTweet = asyncHandler(async (req, res) => {
@@ -87,4 +120,4 @@ const deleteTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tweet, "Tweet deleted successfully"));
 });
 
-export { createTweet, getUserTweets, updateTweet, deleteTweet };
+export { createTweet, getUserTweets, getAllTweets, updateTweet, deleteTweet };

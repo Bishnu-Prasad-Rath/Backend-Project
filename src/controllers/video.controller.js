@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import { Video } from "../models/video.model.js";
+import { Live } from "../models/live.model.js";
+import { Subscription } from "../models/subscription.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -86,6 +88,8 @@ let cachedVideos = null;
         thumbnail: 1,
         views: 1,
         createdAt: 1,
+        duration: 1,
+        "owner._id": 1,
         "owner.username": 1,
         "owner.fullName": 1,
         "owner.avatar": 1,
@@ -93,9 +97,7 @@ let cachedVideos = null;
     },
   ]);
 
-  if (!videos.length) {
-    throw new ApiError(404,[], "Videos not found");
-  }
+  // Don't throw 404, just return empty array so frontend doesn't crash
 
   await setVideosCache(params,videos);
   
@@ -134,7 +136,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     thumbnail: uploadedThumbnail.url,
     owner: req.user._id,
     isPublished: true,
-    duration: uploadedVideo.duration,
+    duration: Math.round(uploadedVideo.duration || 0),
   });
 
   await incrementVideos(req.user._id);
@@ -161,20 +163,23 @@ const getVideoById = asyncHandler(async (req, res) => {
 
   const ownerId = videoDoc.owner;
 
-await Video.findByIdAndUpdate(videoId, {
-  $inc: { views: 1 },
-});
+  if (req.query.inc === "true") {
+    await Video.findByIdAndUpdate(videoId, {
+      $inc: { views: 1 },
+    });
 
-
-await incrementViews(ownerId);
-
-await updateTrendingScore(videoId, 2);
+    await incrementViews(ownerId);
+    await updateTrendingScore(videoId, 2);
+  }
 
   const cachedVideo = await getVideoCache(videoId);
 
   if(cachedVideo){
-
-cachedVideo.views += 1;
+    if (req.query.inc === "true") {
+      cachedVideo.views += 1;
+      // Also update the cache so future requests without ?inc=true see the new view
+      await setVideoCache(videoId, cachedVideo);
+    }
 
     return res
     .status(200)
@@ -209,6 +214,7 @@ cachedVideo.views += 1;
         thumbnail: 1,
         views: 1,
         createdAt: 1,
+        "owner._id": 1,
         "owner.username": 1,
         "owner.fullName": 1,
         "owner.avatar": 1,
@@ -230,29 +236,53 @@ cachedVideo.views += 1;
 });
 
 const getTrending = asyncHandler(async (req, res) => {
-  const videoIds = await getTrendingScore(10);
+  let redisResult = await getTrendingScore(50); // Get top 50
 
-  if(!videoIds.length){
-    return res
-    .status(200)
-    .json(new ApiResponse(200, [], "No trending videos found."));
+  // Hybrid Warm-up Fallback
+  if (!redisResult || !redisResult.length) {
+      console.log("Trending ZSET is empty! Performing MongoDB warm-up...");
+      const topVideos = await Video.find({ isPublished: true }).sort({ views: -1 }).limit(50);
+      for (const v of topVideos) {
+          await updateTrendingScore(v._id);
+      }
+      redisResult = await getTrendingScore(50);
   }
 
-const videos = await Video.find({
-  _id: { $in: videoIds },
-});
+  if (!redisResult || !redisResult.length) {
+    return res.status(200).json(new ApiResponse(200, [], "No trending items found."));
+  }
 
-const videoMap = new Map(
-  videos.map((v) => [v._id.toString(), v])
-);
+  // Parse WITHSCORES array: [id1, score1, id2, score2, ...]
+  const itemIds = [];
+  const scores = {};
+  for (let i = 0; i < redisResult.length; i += 2) {
+      const id = redisResult[i];
+      const score = parseFloat(redisResult[i + 1]);
+      itemIds.push(id);
+      scores[id] = score;
+  }
 
-const orderedVideos = videoIds.map((id) =>
-  videoMap.get(id.toString())
-);
+  // Query both Video and Live collections
+  const [videos, lives] = await Promise.all([
+      Video.find({ _id: { $in: itemIds } }).populate("owner", "username fullName avatar"),
+      Live.find({ _id: { $in: itemIds } }).populate("streamer", "username fullName avatar")
+  ]);
 
-  return res
-  .status(200)
-  .json(new ApiResponse(200, orderedVideos, "trending videos fetched successfully"));
+  const combinedMap = new Map();
+  videos.forEach((v) => combinedMap.set(v._id.toString(), { ...v.toObject(), type: "video" }));
+  lives.forEach((l) => combinedMap.set(l._id.toString(), { ...l.toObject(), type: "live" }));
+
+  // Preserve rank order and append rank/score data
+  const orderedItems = itemIds.map((id, index) => {
+      const item = combinedMap.get(id.toString());
+      if (item) {
+          item.trendingRank = index + 1;
+          item.trendingScore = scores[id];
+      }
+      return item;
+  }).filter(Boolean);
+
+  return res.status(200).json(new ApiResponse(200, orderedItems, "Trending items fetched successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -368,6 +398,67 @@ await deleteCache("videos:all");
     .json(new ApiResponse(200, video, "Video status changed successfully"));
 });
 
+const getSubscribedFeed = asyncHandler(async (req, res) => {
+  const subscriptions = await Subscription.find({ subscriber: req.user._id });
+  const channelIds = subscriptions.map(sub => sub.channel.toString());
+
+  // 1. Fetch Feed Data
+  let videos = [];
+  let lives = [];
+
+  if (channelIds.length > 0) {
+      [videos, lives] = await Promise.all([
+          Video.find({ owner: { $in: channelIds }, isPublished: true })
+               .sort({ createdAt: -1 })
+               .limit(50)
+               .populate("owner", "username fullName avatar"),
+          Live.find({ streamer: { $in: channelIds }, isLive: true, isActive: true })
+              .sort({ createdAt: -1 })
+              .limit(50)
+              .populate("streamer", "username fullName avatar")
+      ]);
+  }
+
+  const combined = [
+      ...videos.map(v => ({ ...v.toObject(), type: "video" })),
+      ...lives.map(l => ({ ...l.toObject(), type: "live" }))
+  ];
+
+  combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  // 2. Fetch Suggestions Data
+  let suggestedVideos = [];
+  try {
+      const trendingRedisIds = await getTrendingScore(15);
+      
+      const itemIds = [];
+      for (let i = 0; i < trendingRedisIds.length; i += 2) {
+          itemIds.push(trendingRedisIds[i]);
+      }
+
+      const currentUser = await mongoose.model("User").findById(req.user._id).select("watchHistory");
+      const watchHistoryStr = currentUser.watchHistory.map(id => id.toString());
+
+      // Filter logic: Not watched, not subscribed to
+      const potentialSuggestions = await Video.find({ _id: { $in: itemIds }, isPublished: true })
+          .populate("owner", "username fullName avatar");
+
+      suggestedVideos = potentialSuggestions.filter(v => {
+          const ownerIdStr = v.owner._id.toString();
+          const videoIdStr = v._id.toString();
+          return !channelIds.includes(ownerIdStr) && !watchHistoryStr.includes(videoIdStr);
+      }).slice(0, 5); // Return top 5
+
+  } catch (error) {
+      console.error("Failed to fetch suggestions for feed:", error);
+  }
+
+  return res.status(200).json(new ApiResponse(200, {
+      feed: combined,
+      suggestions: suggestedVideos
+  }, "Subscribed feed and suggestions fetched successfully"));
+});
+
 export {
   getAllVideos,
   publishAVideo,
@@ -376,4 +467,5 @@ export {
   deleteVideo,
   togglePublishStatus,
   getTrending,
+  getSubscribedFeed,
 };
